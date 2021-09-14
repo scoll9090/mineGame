@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<title>What's up </title>
+
+<style>
+
+
+body{
+
+padding:20px;
+}
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+button {
+position: absolute;
+    top: 0;
+    left: 200px;
+}
+#bigDiv{
+	 position: absolute;
+    top: 0;
+    left: 100px;
+	height:50px;
+	width:240px;
+
+
+}
+#container{
+	    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    /* vertical-align: middle; */
+    height: 50px;
+}
+#difficulty{
+
+}
+span{
+
+
+}
+.info{
+		margin-right: 5px;
+}
+#tetris{
+	
+}
+</style>
+<body>
+<canvas id="tetris5" width="1000" height="1000"></canvas>
+<canvas id="tetris" width="1000" height="1000"></canvas>
+<canvas id="tetris2" width="500" height="500"></canvas>
+<canvas id="tetris3" width="500" height="500"></canvas>
+
+<canvas id="tetris4" width="1000" height="1000"></canvas>
+<div id="bigDiv">
+	<div id="container">
+		<select name="difficulty" id="difficulty">
+    <option value="easy" selected>Easy</option>
+    <option value="medium">Medium</option>
+    <option value="hard">Hard</option>
+ 
+</select>
+<div id="flags"><span class="info">Flags</span><span id="numFlags">10</span></div>
+<div id="time"><span class="info">Time</span><span id="timeElasped">000</span></div>
+	</div>
+</div>
+
+
+
+
+
+<script>
+	var canvas = document.getElementById('tetris');
+	var canvas2 = document.getElementById('tetris2');
+	var canvas3 = document.getElementById('tetris3');
+	var canvas4 = document.getElementById('tetris4');
+	var canvas5 = document.getElementById('tetris5');
+	var ctx = canvas.getContext('2d');
+	var ctx2 = canvas2.getContext('2d');
+	var ctx3 = canvas3.getContext('2d');
+	var ctx4 = canvas4.getContext('2d');
+	var ctx5 = canvas5.getContext('2d');
+	var safeSpaces = 0
+	var initialized = false
+	var timer = 0
+	var numFlags = document.getElementById('numFlags');
+	var timeElasped = document.getElementById('timeElasped');
+	var time = 0;
+	var flags = 10;
+	var ststyle = 'red'
+	var button = document.getElementById('toggle');
+	var width = 45;
+	var height = 45;
+	var rows = 8;
+	var cols = 8;
+	var totalSpots = rows* cols
+	var x = 50
+	var y = 50
+	var bombs = 10;
+	var outlineWidth = 4
+	var vals = [[1,'#1976d2'],[2,'#388e3c'],[3,'#d33231'],[4,'#8026a2'],[5,'#ff8f00'],[6,'teal'],[7,'black'],[8,'grey']]
+	var colors = new Map(vals)
+	var board = []
+	var visited = []
+	class Square{
+		
+		constructor(i,j){
+			this.i = i
+			this.j = j
+			this.hasBomb = false
+			this.adjacentBombs = 0
+			this.revealed = false
+			this.marked = false
+			
+		
+		}
+	}
+	class GameSettings{
+		constructor(width,height,rows,cols,bombs){
+			this.width = width
+			this.height = height
+			this.rows = rows
+			this.cols = cols
+			this.bombs = bombs
+		
+		}
+	
+	}
+	var gameMap = new Map()
+	gameMap.set('easy',new GameSettings(45,45,8,8,10))
+	gameMap.set('medium',new GameSettings(30,30,16,16,40))
+	gameMap.set('hard',new GameSettings(30,30,20,20,99))
+	
+	function createBoard(){
+		for(let i = 0; i< rows; i++){
+		board.push([])
+		visited.push([])
+		for(let j = 0; j < cols; j++){
+			board[i].push(new Square(i,j))
+			visited[i].push(false)
+		}
+	}
+	
+	}
+	
+	createBoard()
+	var select = document.getElementById('difficulty')
+	document.addEventListener('change',handleChange)
+	function handleChange(e){
+		console.log(e)
+		if(e.target == select){
+		      
+			resetGame()
+			 
+			
+			
+		}
+	}
+	function resetGame(){
+		let settings = gameMap.get(select.value)
+				initialized = false
+				clearInterval(timer)
+				 width = settings.width;
+	           height = settings.height;
+	          rows = settings.rows;
+	         cols = settings.cols;
+			 bombs = settings.bombs;
+			 flags = settings.bombs
+			 time = 0
+			 ctx.clearRect(0,0,canvas.width,canvas.height)
+			 ctx4.clearRect(0,0,canvas.width,canvas.height)
+			 ctx5.clearRect(0,0,canvas.width,canvas.height)
+			 board = []
+			 visited = []
+			 createBoard()
+			 drawCover()
+			 drawGround()
+			 //placeBombs(bombs)
+			 //renderNumbers()
+			 updateFlags()
+			 safeSpaces = 0
+			 totalSpots = rows*cols
+			 let t = document.createTextNode('000')
+	         timeElasped.removeChild(timeElasped.firstChild)
+	         timeElasped.appendChild(t)
+	
+	}
+	function updateFlags(){
+		     let m = document.createTextNode(flags.toString())
+	         numFlags.removeChild(numFlags.firstChild)
+	         numFlags.appendChild(m)
+	}
+	function placeBombs(bombs,r,c){
+		let bombsPlaced = 0;
+		for(let i = 0; i < bombs; i++ ){
+			let x = Math.floor(Math.random() * rows)
+			let y = Math.floor(Math.random() * cols)
+			
+			if(board[x][y].hasBomb || (x >= r - 1 && x <= r  + 1) && (y >= c - 1 && y <= c + 1)){
+			console.log('relocate')
+				i--
+			}else{
+				board[x][y].hasBomb = true
+				ctx5.beginPath();
+				ctx5.arc(50+x*width + width/2, 50+y*width+width/2, 5, 0, Math.PI*2);
+				ctx5.fillStyle = 'black';
+				ctx5.fill();
+				ctx5.closePath();
+				
+			}
+		
+		}
+	
+	}
+	console.table(board)
+	 //ctx.fillRect(25, 25, 100, 100);
+   // ctx.clearRect(45, 45, 60, 60);
+   ctx.strokeStyle = '#87af3a';
+   ctx.fillStyle = '#a2d149';
+   ctx.fillStyle = '#aad751';
+  
+ 
+   function drawCover(){
+	  for(let i = 0; i< cols;i++){
+		for(let j = 0; j < rows; j++){
+			if(i == j || (i%2 == 0 && j%2 == 0) || (i%2 == 1 && j%2 == 1)){
+				ctx.fillStyle = '#aad751';
+			}else{
+				ctx.fillStyle = '#a2d149';
+			}
+			ctx.fillRect(y+i*height,x+j*width,width,height)
+			
+		}
+   }
+   
+   }
+   drawCover()
+
+  function drawGround(){
+	    for(let i = 0; i< cols;i++){
+		for(let j = 0; j < rows; j++){
+			if(i == j || (i%2 == 0 && j%2 == 0) || (i%2 == 1 && j%2 == 1)){
+				ctx5.fillStyle = '#e5c29f';
+			}else{
+				ctx5.fillStyle = '#d7b899';
+			}
+			ctx5.fillRect(y+i*height,x+j*width,width,height)
+			//let num = Math.floor(Math.random() * 8)+ 1
+			
+		
+			//ctx5.fillStyle = colors.get(num);
+			// needs to be revisted incosistent
+			//ctx5.fillText(num.toString(), 50+ width*i+width/2 - ctx.measureText(num.toString()).width *2, 50+ width*j +(width/2)+14);
+			
+		}
+   }
+  
+  }
+  drawGround()
+   //placeBombs(bombs)
+    
+   function drawNumber(i,j){
+	      let num = board[i][j].adjacentBombs
+			if(num == 0){
+				return
+			}
+		
+			ctx5.fillStyle = colors.get(num);
+			// needs to be revisted incosistent
+			if(select.value == 'easy'){
+			ctx5.font = '40px sans-serif';
+			ctx5.textBaseline = 'middle';
+			ctx5.fillText(num.toString(), 50+ width*i+width/2 - ctx.measureText(num.toString()).width *2, 50+ width*j +(width/2)+3);
+			}
+			if(select.value == 'medium'){
+			ctx5.font = '30px sans-serif';
+			ctx5.textBaseline = 'middle';
+			ctx5.fillText(num.toString(), 50+ width*i+width/2 - ctx.measureText(num.toString()).width *2 + 3, 50+ width*j +(width/2)+3);
+			}
+			if(select.value == 'hard'){
+			ctx5.font = '25px sans-serif';
+			ctx5.textBaseline = 'middle';
+			ctx5.fillText(num.toString(), 50+ width*i+width/2 - ctx.measureText(num.toString()).width *2 + 5, 50+ width*j +(width/2)+3);
+			}
+   }
+   function renderNumbers(){
+		for(let i = 0; i < board.length; i++){
+			for(let j =0; j< board[i].length; j++){
+				if(board[i][j].hasBomb == false){
+				board[i][j].adjacentBombs = bombNear(i,j)
+				drawNumber(i,j)
+				}
+			}
+		}
+	
+   }
+   function updateTime(){
+		//debugger
+		if(initialized == false){
+			return
+		}
+		time++
+		let cur = time
+		let str = ''
+		while(cur > 0){
+			if(cur < 10){
+				str+= cur%10
+				cur = 0
+			}else{
+				str+= cur%10
+				cur = Math.floor(cur/10)
+			}
+		}
+		str = str.split('').reverse().join('')
+		
+		if(str.length == 1){
+			str = '0' + '0' + str
+		}
+		if(str.length == 2){
+			str = '0' + str
+		}
+		 let t = document.createTextNode(str)
+	         timeElasped.removeChild(timeElasped.firstChild)
+	         timeElasped.appendChild(t)
+			 //setTimeout(updateTime,1000)
+		
+   }
+   //renderNumbers()
+  
+   function bombNear(x,y){
+		let numFound = 0;
+		
+		if(x>0 && board[x-1][y].hasBomb){
+			numFound++
+		}
+		if(x>0&&y>0 && board[x-1][y-1].hasBomb){
+			numFound++
+		}
+		if(x >0 && y < board[x].length -1&& board[x-1][y+1].hasBomb){
+			numFound++
+		}
+		if(x < board.length -1 && board[x+1][y].hasBomb){
+			numFound++
+		}
+		if(x < board.length-1 && y > 0 && board[x+1][y-1].hasBomb){
+			numFound++
+		}
+		if(x < board.length-1 && y < board[x].length -1 && board[x+1][y+1].hasBomb){
+			numFound++
+		}
+		if(y > 0 && board[x][y-1].hasBomb){
+			numFound++
+		}
+		if(y < board[x].length -1 && board[x][y+1].hasBomb){
+			numFound++
+		}
+		return numFound
+   
+   }
+   
+   //ctx.fillRect(40, 40, 200, 200);
+   
+   //ctx.fillRect(50,50,width,width)
+   // ctx.lineWidth = outlineWidth
+  // ctx.moveTo(50+width-outlineWidth/2,50)
+  // ctx.lineTo(x+width-outlineWidth/2,y+width)
+  //  ctx.moveTo(50,50+width-outlineWidth/2)
+  // ctx.lineTo(x+width,y+width-outlineWidth/2)
+  //   ctx.moveTo(50+outlineWidth/2,50)
+  //ctx.lineTo(x+outlineWidth/2,y+width)
+   //ctx.lineWidth = 4
+   //ctx.moveTo(x,y+outlineWidth/2)
+   //ctx.lineTo(x+width,y+outlineWidth/2)
+  // ctx.stroke()
+  // ctx.fillStyle = '#1976d2';
+  // ctx5.font = '40px sans-serif';
+//ctx5.textBaseline = 'middle';
+//console.log( ctx.measureText('8').width)
+//ctx.fillText('1', 50+width/2 - ctx.measureText('1').width/2, 50+width/2);
+//ctx5.fillText('8', 50 +width/2 - ctx.measureText('8').width *2, 50+ width*0 +(width/2)+3);
+//ctx5.fillText('8', 50+width*0+width/2 - ctx.measureText('8').width/2, 50+ width*0 +(width/2)+3);
+    //ctx.strokeRect(x+4/2, y+4/2, width, height);
+
+	//var ball = document.getElementById('ball');
+
+ctx.scale(1,1);
+
+//context.fillStyle= '#000';
+//context.fillRect(0,0,canvas.width,canvas.height);
+
+var pos = { x: 0, y: 0 };
+function handleRightClick(e){
+	e.preventDefault();
+	  let x = Math.floor((e.offsetX-50)/width)
+  let y = Math.floor((e.offsetY-50)/width) 
+  if(board[x][y].revealed == false){
+  drawFlag(x,y)
+  }
+	return false
+}
+document.addEventListener('mousemove', drawing);
+document.addEventListener('mousedown', setPosition);
+document.addEventListener('contextmenu', handleRightClick,true);
+//document.addEventListener('mouseenter', setPosition);
+//document.addEventListener('click', handleClick);
+function handleClick(event){
+	if(event.target == button){
+		if(ststyle == 'red'){
+			ststyle = 'white'
+		}else{
+			ststyle = 'red'
+		}
+	
+	}
+
+}
+function search(x,y,checkArray){
+	if(board[x][y].hasBomb || checkArray[x][y]){
+		return
+	}
+       ctx.clearRect(50+x*width,50+y*width,width,width)
+	   checkArray[x][y] = true
+	   board[x][y].revealed = true
+	   safeSpaces++
+	   if(board[x][y].adjacentBombs> 0){
+			return
+	   }
+	    if(x>0){
+			search(x-1,y,checkArray)
+		}
+		if(x>0&&y>0){
+			search(x-1,y-1,checkArray)
+		}
+		if(x >0 && y < board[x].length -1){
+			search(x-1,y+1,checkArray)
+		}
+		if(x < board.length -1){
+			search(x+1,y,checkArray)
+		}
+		if(x < board.length-1 && y > 0 ){
+			search(x+1,y-1,checkArray)
+		}
+		if(x < board.length-1 && y < board[x].length -1){
+			search(x+1,y+1,checkArray)
+		}
+		if(y > 0 ){
+			search(x,y-1,checkArray)
+		}
+		if(y < board[x].length -1 ){
+			search(x,y+1,checkArray)
+		}
+		return 
+	
+}
+function drawFlag(i,j){
+
+
+	if(board[i][j].marked == true){
+		flags++
+		board[i][j].marked = false
+		ctx.clearRect(y+i*height,x+j*width,width,height)
+				if(i == j || (i%2 == 0 && j%2 == 0) || (i%2 == 1 && j%2 == 1)){
+				ctx.fillStyle = '#aad751';
+			}else{
+				ctx.fillStyle = '#a2d149';
+			}
+			ctx.fillRect(y+i*height,x+j*width,width,height)
+	}else{
+		ctx.fillStyle = 'red';
+		ctx.fillRect(y+i*height,x+j*width,width,height)
+		board[i][j].marked = true
+		flags--
+	}
+	updateFlags()
+	
+}
+// new position from mouse event
+function setPosition(e) {
+  pos.x = e.clientX;
+  pos.y = e.clientY;
+  let x = Math.floor((e.offsetX-50)/width)
+  let y = Math.floor((e.offsetY-50)/width) 
+
+  
+  if(x<0||x >= board.length  || y < 0 || y >= board.length){
+	return
+  }
+  if(e.buttons == 1){
+  if(initialized == false){
+	ctx5.clearRect(0,0,canvas.width,canvas.height)
+	drawGround()
+	placeBombs(bombs,x,y)
+    renderNumbers()
+	
+	//resetGame()
+	initialized = true
+	timer = setInterval(updateTime,1000)
+  }
+  console.log(x + ' '+ y)
+		  if(board[x][y].hasBomb){
+	console.log('Game Over')
+	resetGame()
+  }else{
+	let checkArray = [...visited]
+	//checkArray[x][y] = true
+	//debugger
+	search(x,y,checkArray)
+	//console.log(safeSpaces+bombs)
+	if(safeSpaces >= totalSpots - bombs){
+		console.log('you win')
+		setTimeout(resetGame,1000*2)
+	}
+	//drawBorder()
+  }
+	
+  
+  }
+
+  //ctx.clearRect(50+x*width,50+y*width,width,width)
+}
+
+
+function drawing(e) {
+  // mouse left button must be pressed
+ 
+  ctx4.fillStyle ="rgba(.2,.2,.2,.3)"
+  ctx4.clearRect(0,0,canvas.width,canvas.height)
+  //console.log(Math.floor((e.offsetX-50)/width)+ ' ' + Math.floor((e.offsetY-50)/width))
+  let x = Math.floor((e.offsetX-50)/width)
+  let y = Math.floor((e.offsetY-50)/width) 
+  //console.log(x+' '+y)
+  if(x >=0 && y >=0 && x<cols && y < rows){
+	ctx4.fillRect(50+x*width,50+y*width,width,width)
+  }
+  
+  if (e.buttons !== 1) return;
+
+
+}
+
+
+function update(){
+
+	requestAnimationFrame(update);
+
+}
+//debugger
+
+
+
+var ball = new Image();
+ball.onload = function() {
+	console.log('loaded')
+ ctx2.drawImage(ball,0,0,100,100)
+ ctx2.drawImage(ball,200,200,100,100)
+ ctx2.drawImage(ball,400,400,100,100)
+ //ctx.clip()
+
+ 
+};
+//ball.src = "apple.png";
+function drawingThis(){
+	ctx3.drawImage(canvas,0,0)
+	ctx3.drawImage(canvas2,0,0)
+
+}
+//context.stroke()
+
+
+</script>
+
+
+
+</body>
+
+
+</html>
